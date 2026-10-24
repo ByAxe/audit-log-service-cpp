@@ -1,5 +1,8 @@
 name: C++ checks
-on: [push, pull_request]
+on:
+  push:
+    branches: [main, session-3/start, session-4/start, session-5/start]
+  pull_request:
 jobs:
   test:
     runs-on: ubuntu-24.04
