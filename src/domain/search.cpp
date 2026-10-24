@@ -7,7 +7,7 @@ namespace audit::domain {
 
 Search::Search(std::optional<std::string> actor, std::optional<Instant> from, std::optional<Instant> to,
                std::optional<Action> action, std::optional<Outcome> outcome,
-               std::optional<std::int64_t> snapshot_id, std::int32_t page, std::int32_t size)
+               std::int64_t snapshot_id, std::int32_t page, std::int32_t size)
     : actor(std::move(actor)), from(from), to(to), action(action), outcome(outcome),
       snapshot_id(snapshot_id), page(page), size(size) {
     if (this->actor && is_blank(*this->actor)) this->actor.reset();

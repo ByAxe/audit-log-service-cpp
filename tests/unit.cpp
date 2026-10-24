@@ -27,9 +27,12 @@ struct AppendFake final : AppendRepository {
 
 struct ReadFake final : ReadRepository {
     std::optional<Search> last_search;
+    std::optional<std::int64_t> maximum;
+    int max_id_calls = 0;
+    std::optional<std::int64_t> max_id() override { ++max_id_calls; return maximum; }
     EventPage find(const Search& search) override {
         last_search = search;
-        return {{}, search.page, search.size, 0};
+        return {{}, search.page, search.size, 0, search.snapshot_id};
     }
 };
 
@@ -78,6 +81,47 @@ void query_preserves_baseline_filter_and_pagination_behavior() {
     rejects([&] { service.find(query); });
 }
 
+void an_empty_journal_resolves_the_boundary_to_zero() {
+    ReadFake repository;
+    audit::application::query::QueryService service(repository);
+    const auto page = service.find({});
+    check(page.snapshot_id == 0 && repository.last_search->snapshot_id == 0,
+          "An empty journal resolves the search and reported boundary to zero");
+}
+
+void an_absent_boundary_uses_the_highest_identifier_in_the_journal() {
+    ReadFake repository;
+    repository.maximum = 99;
+    audit::application::query::QueryService service(repository);
+    const auto page = service.find({});
+    check(page.snapshot_id == 99 && repository.last_search->snapshot_id == 99,
+          "An absent boundary is resolved once and handed to the search");
+}
+
+void an_explicit_boundary_is_not_recomputed() {
+    ReadFake repository;
+    repository.maximum = 99;
+    audit::application::query::QueryService service(repository);
+    audit::application::query::Query query{};
+    query.snapshot_id = 7;
+    const auto page = service.find(query);
+    check(page.snapshot_id == 7 && repository.last_search->snapshot_id == 7,
+          "The supplied boundary is used and reported unchanged");
+    check(repository.max_id_calls == 0, "An explicit boundary does not consult the journal maximum");
+}
+
+void an_explicit_zero_boundary_is_not_missing() {
+    ReadFake repository;
+    repository.maximum = 99;
+    audit::application::query::QueryService service(repository);
+    audit::application::query::Query query{};
+    query.snapshot_id = 0;
+    const auto page = service.find(query);
+    check(page.snapshot_id == 0 && repository.last_search->snapshot_id == 0,
+          "Zero is an explicit boundary rather than an absent parameter");
+    check(repository.max_id_calls == 0, "Explicit zero does not consult the journal maximum");
+}
+
 void instants_preserve_precision_offsets_and_extended_range() {
     const auto precise = parse_instant("2026-10-24T13:00:00.123456789+01:00");
     check(format_instant(precise) == "2026-10-24T12:00:00.123456789Z", "Normalize offset without losing nanos");
@@ -110,6 +154,10 @@ int main() {
     try {
         append_uses_repository_id_and_server_clock();
         query_preserves_baseline_filter_and_pagination_behavior();
+        an_empty_journal_resolves_the_boundary_to_zero();
+        an_absent_boundary_uses_the_highest_identifier_in_the_journal();
+        an_explicit_boundary_is_not_recomputed();
+        an_explicit_zero_boundary_is_not_missing();
         instants_preserve_precision_offsets_and_extended_range();
         enums_use_exact_java_values();
         std::cout << "Unit tests passed\n";

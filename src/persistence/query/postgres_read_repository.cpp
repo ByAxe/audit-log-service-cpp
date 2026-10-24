@@ -23,7 +23,7 @@ domain::EventPage PostgresReadRepository::find(const domain::Search& search) {
   if (search.action) filter("action", " = ", std::string(domain::to_string(*search.action)));
   if (search.outcome) filter("outcome", " = ", std::string(domain::to_string(*search.outcome)));
 
-  if (search.snapshot_id) filter("id", " <= ", std::to_string(*search.snapshot_id), "::bigint");
+  filter("id", " <= ", std::to_string(search.snapshot_id), "::bigint");
 
   auto page_parameters = parameters;
   page_parameters.emplace_back(std::to_string(search.size));
@@ -62,7 +62,17 @@ domain::EventPage PostgresReadRepository::find(const domain::Search& search) {
     total = std::stoll(PQgetvalue(count.get(), 0, 0));
   }
   transaction.commit();
-  return {std::move(content), search.page, search.size, total};
+  return {std::move(content), search.page, search.size, total, search.snapshot_id};
+}
+
+std::optional<std::int64_t> PostgresReadRepository::max_id() {
+  detail::Connection connection(conninfo_);
+  detail::Transaction transaction(connection, true);
+  const auto result = connection.exec("SELECT max(id) FROM audit_events");
+  const auto value = detail::nullable_text(result, 0, 0);
+  const auto maximum = value ? std::optional<std::int64_t>(std::stoll(*value)) : std::nullopt;
+  transaction.commit();
+  return maximum;
 }
 
 }  // namespace audit::persistence

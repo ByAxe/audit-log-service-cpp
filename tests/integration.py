@@ -416,7 +416,7 @@ class PaginationWindowShiftTests(PaginationTest):
     def test_snapshot_id_pins_the_traversal_while_the_journal_grows(self):
         first = self.query(page=0, size=3)
         unbounded_total = first["totalElements"]
-        # The client picks its own boundary; this stage does not report one yet.
+        # A caller-supplied boundary remains valid alongside the boundary now reported.
         boundary = max(self.ids(first))
         bounded_total = self.query(page=0, size=3, snapshotId=boundary)["totalElements"]
         appended = self.append_event("snapshot-boundary-probe@example.test")
@@ -447,6 +447,88 @@ class PaginationWindowShiftTests(PaginationTest):
 
 
 
+class SnapshotBoundaryContractTests(PaginationTest):
+    def traverse(self, actor, boundary, first):
+        traversed = self.ids(first)
+        for page_number in range(1, 20):
+            page = self.query(actor=actor, page=page_number, size=first["size"], snapshotId=boundary)
+            self.assertEqual(page["snapshotId"], boundary)
+            self.assertEqual(page["totalElements"], first["totalElements"])
+            if not page["content"]:
+                return traversed
+            traversed.extend(self.ids(page))
+        self.fail("Traversal did not terminate within 20 page requests")
+
+    def test_first_request_without_snapshot_id_reports_the_boundary_it_read(self):
+        actor = "boundary-reported@example.test"
+        oldest = self.insert_row(actor, "2026-02-10T08:00:00Z")
+        middle = self.insert_row(actor, "2026-02-10T08:01:00Z")
+        newest = self.insert_row(actor, "2026-02-10T08:02:00Z")
+        response = self.query(actor=actor)
+        self.assertEqual(response["snapshotId"], newest)
+        self.assertEqual(self.ids(response), [newest, middle, oldest])
+        self.assertEqual(response["totalElements"], 3)
+
+    def test_repeating_reported_boundary_excludes_an_event_appended_mid_traversal(self):
+        actor = "boundary-traversal@example.test"
+        expected = [self.insert_row(actor, recorded_at) for recorded_at in
+                    ("2026-02-10T08:02:00Z", "2026-02-10T08:01:00Z", "2026-02-10T08:00:00Z")]
+        first = self.query(actor=actor, page=0, size=1)
+        boundary = first["snapshotId"]
+        appended = self.append_event(actor)
+        self.assertGreater(appended, boundary)
+        traversed = self.traverse(actor, boundary, first)
+        self.assertEqual(traversed, expected)
+        self.assertNotIn(appended, traversed)
+        self.assertEqual(self.query(actor=actor, page=0, size=50)["totalElements"], first["totalElements"] + 1)
+
+    def test_boundary_holds_when_actor_filter_also_matches_the_appended_event(self):
+        actor = "boundary-filtered@example.test"
+        expected = [self.insert_row(actor, recorded_at) for recorded_at in
+                    ("2026-02-10T08:02:00Z", "2026-02-10T08:01:00Z", "2026-02-10T08:00:00Z")]
+        self.insert_row("boundary-filtered-other@example.test", "2026-02-10T08:03:00Z")
+        first = self.query(actor=actor, page=0, size=1)
+        boundary = first["snapshotId"]
+        self.assertEqual(first["totalElements"], len(expected))
+        appended = self.append_event(actor)
+        self.assertGreater(appended, boundary)
+        traversed = self.traverse(actor, boundary, first)
+        self.assertEqual(traversed, expected)
+        self.assertNotIn(appended, traversed)
+
+    def test_boundary_is_global_and_not_narrowed_by_actor_filter(self):
+        actor = "boundary-global@example.test"
+        matching = self.insert_row(actor, "2026-02-10T08:01:00Z")
+        non_matching = self.insert_row("boundary-global-other@example.test", "2026-02-10T08:02:00Z")
+        response = self.query(actor=actor)
+        self.assertEqual(response["snapshotId"], non_matching)
+        self.assertGreater(response["snapshotId"], matching)
+        self.assertEqual(self.ids(response), [matching])
+
+    def test_empty_result_and_empty_page_still_report_the_boundary(self):
+        actor = "boundary-empty@example.test"
+        present = self.insert_row(actor, "2026-02-10T08:00:00Z")
+        newest = self.insert_row("boundary-empty-other@example.test", "2026-02-10T08:01:00Z")
+        no_matches = self.query(actor="boundary-empty-absent@example.test")
+        self.assertEqual(self.ids(no_matches), [])
+        self.assertEqual(no_matches["totalElements"], 0)
+        self.assertEqual(no_matches["snapshotId"], newest)
+        first = self.query(actor=actor, page=0, size=1)
+        self.assertEqual(self.ids(first), [present])
+        past_end = self.query(actor=actor, page=1, size=1, snapshotId=first["snapshotId"])
+        self.assertEqual(self.ids(past_end), [])
+        self.assertEqual(past_end["snapshotId"], first["snapshotId"])
+        self.assertEqual(past_end["totalElements"], first["totalElements"])
+
+    def test_explicit_zero_boundary_is_used_and_reported_unchanged(self):
+        self.insert_row("boundary-zero@example.test", "2026-02-10T08:00:00Z")
+        response = self.query(snapshotId=0)
+        self.assertEqual(response["snapshotId"], 0)
+        self.assertEqual(self.ids(response), [])
+        self.assertEqual(response["totalElements"], 0)
+
+
+
 class DatabaseTimestampTests(ApiTest):
     def test_extended_year_rows_round_trip(self):
         actor = "timestamp-era@example.test"
@@ -470,7 +552,7 @@ def main():
     with database() as service, running_service(service, binary):
         ApiTest.service = service
         suite = unittest.TestSuite()
-        for case in (QueryTests, AppendTests, PaginationWindowShiftTests, DatabaseTimestampTests):
+        for case in (QueryTests, AppendTests, PaginationWindowShiftTests, SnapshotBoundaryContractTests, DatabaseTimestampTests):
             suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(case))
         return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
 

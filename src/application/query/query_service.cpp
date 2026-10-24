@@ -6,8 +6,9 @@ namespace audit::application::query {
 QueryService::QueryService(domain::ReadRepository& repository) : repository_(repository) {}
 
 domain::EventPage QueryService::find(const Query& query) {
+    const auto snapshot_id = query.snapshot_id ? *query.snapshot_id : repository_.max_id().value_or(0);
     return repository_.find(domain::Search(query.actor, query.from, query.to, query.action,
-                                           query.outcome, query.snapshot_id, query.page.value_or(0),
+                                           query.outcome, snapshot_id, query.page.value_or(0),
                                            std::min(query.size.value_or(50), 200)));
 }
 
