@@ -7,7 +7,7 @@ QueryService::QueryService(domain::ReadRepository& repository) : repository_(rep
 
 domain::EventPage QueryService::find(const Query& query) {
     return repository_.find(domain::Search(query.actor, query.from, query.to, query.action,
-                                           query.outcome, query.page.value_or(0),
+                                           query.outcome, query.snapshot_id, query.page.value_or(0),
                                            std::min(query.size.value_or(50), 200)));
 }
 

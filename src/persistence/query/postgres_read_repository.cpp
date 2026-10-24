@@ -23,13 +23,15 @@ domain::EventPage PostgresReadRepository::find(const domain::Search& search) {
   if (search.action) filter("action", " = ", std::string(domain::to_string(*search.action)));
   if (search.outcome) filter("outcome", " = ", std::string(domain::to_string(*search.outcome)));
 
+  if (search.snapshot_id) filter("id", " <= ", std::to_string(*search.snapshot_id), "::bigint");
+
   auto page_parameters = parameters;
   page_parameters.emplace_back(std::to_string(search.size));
   page_parameters.emplace_back(std::to_string(static_cast<std::int64_t>(search.page) * search.size));
   const auto rows = connection.exec(
       "SELECT id, to_char(recorded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\" BC'), "
       "actor, action, resource_type, resource_id, outcome, reason, metadata::text FROM audit_events" +
-          where + " ORDER BY recorded_at DESC LIMIT $" + std::to_string(parameters.size() + 1) +
+          where + " ORDER BY recorded_at DESC, id DESC LIMIT $" + std::to_string(parameters.size() + 1) +
           "::integer OFFSET $" + std::to_string(parameters.size() + 2) + "::bigint",
       page_parameters);
 

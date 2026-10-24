@@ -12,6 +12,7 @@ struct Query {
     std::optional<domain::Outcome> outcome;
     std::optional<std::int32_t> page;
     std::optional<std::int32_t> size;
+    std::optional<std::int64_t> snapshot_id;
 };
 
 }

@@ -37,6 +37,7 @@ void register_routes(httplib::Server& server, application::query::QueryService& 
     query.outcome = parameter<domain::Outcome>(request, "outcome", parameter_outcome);
     query.page = parameter<std::int32_t>(request, "page", parameter_integer<std::int32_t>);
     query.size = parameter<std::int32_t>(request, "size", parameter_integer<std::int32_t>);
+    query.snapshot_id = parameter<std::int64_t>(request, "snapshotId", parameter_integer<std::int64_t>);
     const auto page = service.find(query);
     Json content = Json::array();
     for (const auto& event : page.content) content.push_back(event_json(event));

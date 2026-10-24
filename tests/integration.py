@@ -369,6 +369,84 @@ class AppendTests(ApiTest):
         self.assertEqual(self.service.sql("select actor from audit_events where id=1").stdout.strip(), "alice@example.com")
 
 
+class PaginationTest(ApiTest):
+    @staticmethod
+    def ids(page):
+        return [event["id"] for event in page["content"]]
+
+    def insert_row(self, actor, recorded_at):
+        actor = actor.replace("'", "''")
+        recorded_at = recorded_at.replace("'", "''")
+        result = self.service.sql(
+            "insert into audit_events (recorded_at, actor, action, resource_type, resource_id, outcome, reason) "
+            f"values ('{recorded_at}'::timestamptz, '{actor}', 'LOGIN', 'session', 's-snapshot', "
+            "'ALLOWED', 'snapshot boundary fixture') returning id"
+        )
+        return int(result.stdout.splitlines()[0])
+
+    def append_event(self, actor):
+        status, _, event = self.service.request("POST", body={
+            "actor": actor, "action": "LOGIN", "resourceType": "session",
+            "resourceId": "s-window-shift", "outcome": "ALLOWED",
+            "reason": "appended between page requests",
+        })
+        self.assertEqual(status, 201, event)
+        return event["id"]
+
+
+class PaginationWindowShiftTests(PaginationTest):
+    def test_control_traversal_without_concurrent_append_has_no_overlap(self):
+        first = self.query(page=0, size=3)
+        second = self.query(page=1, size=3)
+        self.assertEqual(second["totalElements"], first["totalElements"])
+        self.assertTrue(set(self.ids(first)).isdisjoint(self.ids(second)))
+
+    def test_append_between_page_requests_shifts_the_offset_window(self):
+        first = self.query(page=0, size=3)
+        appended = self.append_event("window-shift-probe@example.test")
+        second = self.query(page=1, size=3)
+        self.assertGreater(appended, self.ids(first)[0])
+        self.assertEqual(second["totalElements"], first["totalElements"] + 1)
+        self.assertEqual([event_id for event_id in self.ids(first) if event_id in self.ids(second)],
+                         [self.ids(first)[-1]])
+        all_ids = self.ids(self.query(page=0, size=200))
+        self.assertTrue(set(self.ids(first)).issubset(all_ids))
+        self.assertIn(appended, all_ids)
+
+    def test_snapshot_id_pins_the_traversal_while_the_journal_grows(self):
+        first = self.query(page=0, size=3)
+        unbounded_total = first["totalElements"]
+        # The client picks its own boundary; this stage does not report one yet.
+        boundary = max(self.ids(first))
+        bounded_total = self.query(page=0, size=3, snapshotId=boundary)["totalElements"]
+        appended = self.append_event("snapshot-boundary-probe@example.test")
+        self.assertGreater(appended, boundary)
+        self.assertEqual(self.query(page=0, size=3)["totalElements"], unbounded_total + 1)
+        traversed = []
+        for page_number in range(200):
+            page = self.query(page=page_number, size=3, snapshotId=boundary)
+            self.assertEqual(page["totalElements"], bounded_total)
+            if not page["content"]:
+                break
+            traversed.extend(self.ids(page))
+        else:
+            self.fail("Bounded traversal did not terminate within 200 pages")
+        self.assertEqual(len(traversed), len(set(traversed)))
+        self.assertNotIn(appended, traversed)
+        self.assertTrue(all(event_id <= boundary for event_id in traversed))
+        self.assertEqual(len(traversed), bounded_total)
+
+    def test_equal_recorded_at_is_ordered_by_id_descending(self):
+        actor = "tie-break-probe@example.test"
+        first_older = self.insert_row(actor, "2026-01-05T10:00:00Z")
+        first_newer = self.insert_row(actor, "2026-01-05T11:00:00Z")
+        second_older = self.insert_row(actor, "2026-01-05T10:00:00Z")
+        second_newer = self.insert_row(actor, "2026-01-05T11:00:00Z")
+        self.assertEqual(self.ids(self.query(actor=actor, size=200)),
+                         [second_newer, first_newer, second_older, first_older])
+
+
+
 class DatabaseTimestampTests(ApiTest):
     def test_extended_year_rows_round_trip(self):
         actor = "timestamp-era@example.test"
@@ -392,7 +470,7 @@ def main():
     with database() as service, running_service(service, binary):
         ApiTest.service = service
         suite = unittest.TestSuite()
-        for case in (QueryTests, AppendTests, DatabaseTimestampTests):
+        for case in (QueryTests, AppendTests, PaginationWindowShiftTests, DatabaseTimestampTests):
             suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(case))
         return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
 
