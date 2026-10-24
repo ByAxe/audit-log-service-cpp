@@ -1,0 +1,41 @@
+name: C++ checks
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: audit_log_test
+          POSTGRES_USER: audit
+          POSTGRES_PASSWORD: audit
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U audit -d audit_log_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev postgresql-client
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+      - run: cmake --build build -j2
+      - run: ctest --test-dir build --output-on-failure
+      - run: tests/run-postgres.sh build/audit-log-service
+        env:
+          AUDIT_LOG_TEST_DB_URL: "host=127.0.0.1 port=5432 dbname=audit_log_test user=audit password=audit"
+      - name: Check migration lifecycle on a separate database
+        run: |
+          psql -c 'CREATE DATABASE audit_log_migration_test'
+          python3 tests/migrations.py build/audit-log-service
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: audit
+          PGPASSWORD: audit
+          PGDATABASE: postgres
+          AUDIT_LOG_TEST_DB_URL: "host=127.0.0.1 port=5432 dbname=audit_log_migration_test user=audit password=audit"
+      - name: Check session 5 standalone exercise
+        if: ${{ hashFiles('.training/session-5/CMakeLists.txt') != '' }}
+        run: |
+          cmake -S .training/session-5 -B build-session-5
+          cmake --build build-session-5 -j2
+          ctest --test-dir build-session-5 --output-on-failure

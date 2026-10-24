@@ -1,0 +1,10 @@
+/build*/
+/.cache/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
