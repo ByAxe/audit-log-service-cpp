@@ -83,11 +83,15 @@ inline domain::Instant parameter_instant(std::string_view value) {
       input >> std::get_time(&date, "%a, ");
       expected_weekday = date.tm_wday;
     }
-    input >> std::get_time(&date, "%d %b %Y %H:%M:%S");
+    input >> std::get_time(&date, "%d %b %Y %H:%M");
+    if (input.peek() == ':') { input.get(); input >> std::get_time(&date, "%S"); }
     std::string zone, trailing;
     if (input.fail() || !(input >> zone) || (input >> trailing)) throw std::invalid_argument("invalid HTTP date");
     std::string offset;
-    if (zone == "GMT" || zone == "gmt") offset = "Z";
+    for (auto& character : zone) {
+      if (character >= 'A' && character <= 'Z') character += 'a' - 'A';
+    }
+    if (zone == "gmt") offset = "Z";
     else if (zone.size() == 5 && (zone[0] == '+' || zone[0] == '-')) offset = zone.substr(0, 3) + ':' + zone.substr(3);
     else throw std::invalid_argument("invalid HTTP date zone");
     std::ostringstream iso;

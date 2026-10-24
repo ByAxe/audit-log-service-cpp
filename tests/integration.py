@@ -248,7 +248,8 @@ class QueryTests(ApiTest):
         for invalid in ("+0x1", "+-1", "0x-1"):
             self.assertEqual(self.service.request(params={"page": invalid})[0], 400)
         self.assert_ids([12], **{"from": "1776678900000"})
-        self.assert_ids([12, 11, 10, 9, 8, 7, 6], **{"from": "Mon, 20 Apr 2026 09:25:00 GMT"})
+        for date in ("Mon, 20 Apr 2026 09:25:00 GMT", "Mon, 20 Apr 2026 09:25 GmT"):
+            self.assert_ids([12, 11, 10, 9, 8, 7, 6], **{"from": date})
         self.assertEqual(self.service.request(params={"from": "Tue, 20 Apr 2026 09:25:00 GMT"})[0], 400)
 
     def test_invalid_page_size_and_timestamp(self):
