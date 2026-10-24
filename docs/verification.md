@@ -22,3 +22,7 @@ The original Java full suite and Docker image were not rerun for this report. Se
 ## Session 3
 
 Application revision: `ed582dd`. [Linux / PostgreSQL 16 run](https://github.com/ByAxe/audit-log-service-cpp/actions/runs/40081357266): build passed, CTest 2/2, HTTP/PostgreSQL 29 tests, migration lifecycle passed. The added four pagination scenarios establish the inherited homework-2 boundary and ordering; the response boundary remains the session-3 assignment.
+
+## Session 5 standalone exercise
+
+The standalone C++20 compile with `-Wall -Wextra -Wpedantic` passed on 2026-10-24, with all eight owner-baseline scenarios passing. This establishes the starter's owner behavior. There are no status acceptance tests in the starter; adding status remains the team task. CI also checks its standalone CMake entry point.
