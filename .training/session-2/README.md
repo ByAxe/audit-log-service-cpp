@@ -34,15 +34,16 @@ The bug is already present in the starting code. Two GET requests without an int
 
 After the trainer releases evidence B, run the complete scenario in a fresh temporary PostgreSQL database:
 
+Use the latest starting branch (`session-2/start` or `session-2/pagination-investigation`). Preserve your own work before updating; if you have already committed your investigation, use a separate clone for this demonstration.
+
 ```sh
 git fetch origin
-git switch session-2/start
 git pull --ff-only
 cmake -S . -B build
 cmake --build build -j2
 python3 .training/session-2/reproduce.py build/audit-log-service
 ```
 
-Preserve your own work before switching branches. The script starts and stops its own service and database, rejects an external database URL, and never sends requests to an existing server. It needs the same PostgreSQL tools as `tests/run-postgres.sh`.
+The script starts and stops its own service and database, rejects an external database URL, and never sends requests to an existing server. It needs the same PostgreSQL tools as `tests/run-postgres.sh`.
 
 The final line must contain `SESSION_2_BUG_REPRODUCED`: page 0 is `[12, 11, 10]`, then POST adds an event and page 1 becomes `[10, 9, 8]`. A scan limited to the original four pages misses ID 1, which remains readable on page 4. This is a reproduction of the training bug, not its fix. The complete integration suite can be green because its existing pagination checks do not append between those page requests.
