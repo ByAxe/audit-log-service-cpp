@@ -9,7 +9,7 @@ git rev-parse HEAD
 git status --short
 ```
 
-Record the C++ starting SHA; the Java revision in [source provenance](../../docs/source-provenance.md) identifies the source snapshot, not this C++ checkout. Read [AGENTS.md](../../AGENTS.md), the [current query contract](../../.specs/api/query-api.md) and the [investigation handover](../../.specs/investigations/pagination-window-shift.md). Run the root build and check commands; supplied historical evidence is not your own run.
+Keep a link to your working branch. The Java revision in [source provenance](../../docs/source-provenance.md) identifies the source snapshot, not this C++ checkout. Read [AGENTS.md](../../AGENTS.md), the [current query contract](../../.specs/api/query-api.md) and the [investigation handover](../../.specs/investigations/pagination-window-shift.md). Run the root build and check commands; supplied historical evidence is not your own run.
 
 ## The next contract
 
@@ -20,7 +20,7 @@ Before editing, fill in the six fields in the prepared [change card](../../.spec
 3. A valid event appended after the first GET completes receives an id above S and stays outside that traversal.
 4. Repeating the filters, size and S advances through the original set without duplicates or gaps; `totalElements` remains constant.
 5. Existing filters, validation, page/size behavior and `recordedAt DESC, id DESC` order remain unchanged.
-6. State the owner's decision for global versus filtered maximum, an empty journal and a filtered result with no matches. Do not silently infer these decisions from an example.
+6. Use the exercise's selected behavior: S is the global maximum id before user filters; an empty journal gives S=0. A supplied S, including zero, is used and returned without recalculation. A filter with no matches returns empty content and totalElements=0 while retaining the global S.
 
 For the illustrative first page `[12, 11, 10]`, the upper boundary is 12. The last row's id 10 is not that boundary. A first request can start at any page; S is not derived from a row's page position.
 
@@ -28,8 +28,8 @@ For the illustrative first page `[12, 11, 10]`, the upper boundary is 12. The la
 
 Agree the contract and the smallest expected file list with the task owner. Add a meaningful failing HTTP/PostgreSQL check, inspect why it fails, make the minimal change, and run the relevant checks. Keep a requirement-to-evidence table with PASS, FAIL or UNKNOWN. Do not weaken a check to obtain a green result.
 
-The new checks must establish that the first request returns S, that a later append lands above it, that subsequent pages repeat S, that originals are complete and unique, and that the total remains constant. Exercise a filter as well: for example, read `actor=A,page=0,size=1`, append another A after the GET completes, then continue at the same S. If your primary scenario already uses actor, use outcome for an additional distinguishing probe.
+Use one combined HTTP/PostgreSQL test in an isolated scenario without parallel writes. Create two events with a new actor A, then an event with a new actor B; save all three ids. Request `actor=A,page=0,size=1` without S: the response's S must equal B's id and totalElements must equal 2. After that GET completes, append another A, then request page 1 with actor A and the returned S. Both responses must retain S and totalElements=2; together the pages contain exactly the two original A events, without duplicates or the new A.
 
 Run the integration command from the root README and record the named scenario's result; it exercises the actual binary and PostgreSQL. Unit checks can prove service boundary resolution, but a stub cannot prove the SQL restriction. There is no new opaque token, cursor, migration or write-path task here.
 
-Independent acceptance concerns an exact source revision. Give a peer the contract, changed files and actual output without the chat; the human reviewer decides whether the evidence supports acceptance. [Homework 3](homework.md) specifies both required reports.
+Show a peer the result, the decisions that led to it and your actual checks. Explain what remains unverified, answer the peer's questions, and record their remark and your response. Swap roles; allow six minutes for each person and finish an incomplete discussion in the homework. A separate peer test run or additional probe is not required for this discussion. [Homework 3](homework.md) specifies both required reports.
