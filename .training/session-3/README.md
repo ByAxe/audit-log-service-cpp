@@ -13,7 +13,7 @@ Record the C++ starting SHA; the Java revision in [source provenance](../../docs
 
 ## The next contract
 
-Before editing, write six concise contract statements in `.specs/changes/pagination-snapshot.md`:
+Before editing, fill in the six fields in the prepared [change card](../../.specs/changes/pagination-snapshot.md). Use these requirements when agreeing the contract:
 
 1. A request without `snapshotId` fixes an upper boundary S once and already applies it to its own content and count.
 2. The response returns S as `snapshotId`; later requests repeat it and receive the same S back.
