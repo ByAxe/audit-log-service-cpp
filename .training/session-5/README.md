@@ -160,18 +160,12 @@ checks yourself, using expected IDs from the fixture and contract rather than
 the function's current output. Check complete records and order, not only a
 result count. Keep every existing check.
 
-## Allowed changes
+## Scope
 
-Change only:
-
-- `filter-tasks.cpp`
-- `filter-tasks-test.cpp`
-- `task.md`
-
-The fixture, headers, README, AGENTS, build configuration, application, migrations,
-CI, root instructions, `.specs/`, and sessions 1–4 are outside the allowed scope.
-Do not investigate or repair unrelated files. Do not disable checks or report
-PASS without executing them.
+Keep changes focused on adding `status` to `owner`, the corresponding checks,
+and the task card. Preserve the fixed teaching data and agreed contract.
+Do not refactor the Audit Log application or repair unrelated issues.
+Do not disable checks or report PASS without executing them.
 
 ## Record the result
 
@@ -185,6 +179,5 @@ If your team makes a commit, compare against your actual recorded starting SHA:
 git diff <YOUR_START_SHA> -- .training/session-5
 ```
 
-Stop and ask the task owner if you need a new behavior decision or a file outside
-the allowed three. If the check cannot run, record the specific command and
-blocker in `task.md`.
+Ask the task owner if a behavior decision beyond this contract is needed.
+If the check cannot run, record the specific command and blocker in `task.md`.

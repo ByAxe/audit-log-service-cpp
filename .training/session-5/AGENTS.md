@@ -9,15 +9,9 @@ context and C++20 check. Do not start the application, PostgreSQL, Docker, netwo
 services, package installation, or the main project's build. Data is fixed in
 `tasks.hpp`. The application's Query API does not gain owner/status fields.
 
-Change only three files:
-
-- `filter-tasks.cpp`
-- `filter-tasks-test.cpp`
-- `task.md`
-
-The fixture, headers, README, AGENTS, CMake configuration, `.specs/`, earlier
-training materials, application source/tests, migrations, Docker, CI, and root
-instructions are outside scope. Do not search for or repair unrelated issues.
+Keep changes focused on adding `status` to `owner`, the corresponding checks,
+and the task card. Preserve the fixed teaching data and agreed contract.
+Do not refactor the Audit Log application or repair unrelated issues.
 An unrelated discrepancy does not block this exercise.
 
 Use one working copy and one result per team. The team agrees its plan and
@@ -29,6 +23,6 @@ disable, or weaken them. PASS requires an actual run. Recompile and rerun after
 code changes. Identify uncommitted working copies honestly, and label supplied
 output as supplied rather than your own execution.
 
-Stop and ask the task owner if a new behavior decision or an additional file
-is needed. Record a concrete blocker inside the task in `task.md`. Do not invent
-product decisions or successful check output.
+Ask the task owner if a behavior decision beyond the exercise contract is needed.
+Record a concrete blocker inside the task in `task.md`. Do not invent product
+decisions or successful check output.

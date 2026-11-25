@@ -14,12 +14,6 @@ Contract and expected results: [README.md](README.md). Fixed input:
 and complete records. Do not add sorting, trimming, case conversion, a UI,
 caching, or a general filter language.
 
-## Allowed files
-
-- `.training/session-5/filter-tasks.cpp`
-- `.training/session-5/filter-tasks-test.cpp`
-- `.training/session-5/task.md`
-
 ## Short agreed plan
 
 1.
